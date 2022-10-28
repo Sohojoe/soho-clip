@@ -4,17 +4,22 @@ channels:
   - conda-forge
 dependencies:
   - python>=3.9, <3.10
-  - pip>=22.2
+  - pip
+  - pytorch
+  - torchvision 
+  - torchaudio 
+  - cudatoolkit=11.6
   - pip:
       - ftfy
       - regex
       - tqdm
-      - transformers==4.21.2
+      # - transformers==4.21.2
+      - transformers==4.15.0
       - fairscale
       - requests
       - -e git+https://github.com/CompVis/taming-transformers.git@master#egg=taming-transformers
       - -e git+https://github.com/openai/CLIP.git@main#egg=clip
       - -e git+https://github.com/pharmapsychotic/BLIP.git@main#egg=blip
-      - -e .
+      # - -e .
 variables:
   MY_VAR: 1
