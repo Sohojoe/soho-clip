@@ -22,8 +22,23 @@ python clip_interrogator.py https://curiocity.com/wp-content/uploads/2021/03/sun
 
 #### setup
 ```
+pip install openai
 set OPENAI_API_KEY=your open api key
 ```
 
 #### run
+```
 python gpt3_clip_interrogator.py https://curiocity.com/wp-content/uploads/2021/03/sunset-1-1265x600.jpg
+```
+
+----------------------------
+
+#### setup
+```
+conda install -c conda-forge opencv
+```
+
+#### run
+```
+
+```
