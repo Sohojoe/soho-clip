@@ -300,4 +300,51 @@ def show_ui():
     image_txt.on_submit(go)
     display(ui)
 
-show_ui()
+
+def no_ui():
+    # uploader = widgets.FileUpload(accept='image/*', multiple=False)
+
+    # ui = widgets.VBox([
+    #     widgets.HBox([widgets.Label('image url:'), image_txt]),
+    #     widgets.HBox([widgets.Label('or upload:'), uploader]),
+    #     widgets.Label(''),
+    #     go_button
+    # ])
+
+    # image_url = image_txt.value
+    # if len(uploader.value):
+    #     print(uploader.value)
+    #     print(uploader.value.items())
+    #     for name, file_info in uploader.value.items():
+    #         image = Image.open(io.BytesIO(file_info['content']))
+    #         break
+    # else:
+    if str(image_url).startswith('http://') or str(image_url).startswith('https://'):
+        image = Image.open(requests.get(image_url, stream=True).raw).convert('RGB')
+    else:
+        image = Image.open(image_url).convert('RGB')
+
+    # IPython.display.clear_output()
+    print('\n\n')
+    thumb = image.copy()
+    thumb.thumbnail([blip_image_eval_size, blip_image_eval_size])
+    print("Interrogating... " + image_url)
+    # display(thumb)
+
+    prompt = interrogate(image)
+    # IPython.display.clear_output()
+    # show_ui()
+
+    print('\n\n')
+    print('prompt:' + prompt)
+    # display(thumb)
+    # ui = widgets.VBox([
+    #     widgets.Textarea(
+    #         value=prompt,
+    #         description='prompt:',
+    #         layout=widgets.Layout(width='75%', height='6em')
+    #     )
+    # ])
+
+# show_ui()
+no_ui()
