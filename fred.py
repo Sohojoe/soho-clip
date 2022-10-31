@@ -60,64 +60,6 @@ clip_model_name = 'ViT-L/14' #@param ['ViT-B/32', 'ViT-B/16', 'ViT-L/14', 'ViT-L
 clip_model, clip_preprocess = clip.load(clip_model_name, device="cuda")
 clip_model.cuda().eval()
 
-def rank_top(image_features, text_array):
-    text_tokens = clip.tokenize([text for text in text_array]).cuda()
-    with torch.no_grad():
-        text_features = clip_model.encode_text(text_tokens).float()
-    text_features /= text_features.norm(dim=-1, keepdim=True)
-
-    similarity = torch.zeros((1, len(text_array)), device=device)
-    for i in range(image_features.shape[0]):
-        similarity += (image_features[i].unsqueeze(0) @ text_features.T).softmax(dim=-1)
-
-    _, top_labels = similarity.cpu().topk(1, dim=-1)
-    return text_array[top_labels[0][0].numpy()]
-
-def rank_top_from_tokens(image_features, text_tokens):
-    with torch.no_grad():
-        text_features = clip_model.encode_text(text_tokens).float()
-    text_features /= text_features.norm(dim=-1, keepdim=True)
-
-    similarity = torch.zeros((1, len(text_array)), device=device)
-    for i in range(image_features.shape[0]):
-        similarity += (image_features[i].unsqueeze(0) @ text_features.T).softmax(dim=-1)
-
-    # _, top_labels = similarity.cpu().topk(1, dim=-1)
-    top_scores, top_labels = similarity.cpu().topk(1, dim=-1)
-    top_index = int(top_labels[0][0].numpy())
-    top_label = text_array[top_index]
-    top_score = top_scores[0][0].numpy().max()
-    return top_index, top_score
-
-def rank_from_tokens(image_features, text_tokens, top_n=None):
-    if top_n is None:
-        top_n = len(text_tokens)
-    with torch.no_grad():
-        text_features = clip_model.encode_text(text_tokens).float()
-    text_features /= text_features.norm(dim=-1, keepdim=True)
-
-    similarity = torch.zeros((1, len(text_array)), device=device)
-    for i in range(image_features.shape[0]):
-        # similarity += (image_features[i].unsqueeze(0) @ text_features.T).softmax(dim=-1)
-        similarity += (image_features[i].unsqueeze(0) @ text_features.T)
-
-    # _, top_labels = similarity.cpu().topk(1, dim=-1)
-    top_scores, top_labels = similarity.cpu().topk(top_n, dim=-1)
-    top_indexes = top_labels[0].numpy()
-    top_scores = top_scores[0].numpy()
-    return top_indexes, top_scores
-
-def interrogate(image, text_tokens):
-    images = clip_preprocess(image).unsqueeze(0).cuda()
-    with torch.no_grad():
-        image_features = clip_model.encode_image(images).float()
-    image_features /= image_features.norm(dim=-1, keepdim=True)
-
-    # index, score = rank_top_from_tokens(image_features, text_tokens)
-    # return index, score
-    indexs, scores = rank_from_tokens(image_features, text_tokens)
-    return indexs, scores
-
 def interrogate_scores(image, text_tokens):
     images = clip_preprocess(image).unsqueeze(0).cuda()
     with torch.no_grad():
@@ -136,26 +78,17 @@ def interrogate_scores(image, text_tokens):
     normalized_scores = similarity.softmax(dim=-1)[0].cpu().numpy()
     return scores, normalized_scores
 
-
-text_array = [
-    'i see a bunny that is smelling the flowers',
-    'i do not see a bunny',
-    'i see a big bunny, but it is not smelling the flowers',
-    'Donald Trump'
-]
-
 semantic_text_array = [
-    'rabbit is smelling the flowers',
-    'rabbit is not smelling the flowers',
-    'a rabbit',
-    'no rabbit',
+    'bunny is smelling the flowers',
+    'bunny is not smelling the flowers',
+    'a bunny',
+    'no bunny',
     'flowers',
     'no flowers',
-    'rabbit is close to flowers',
-    'rabbit is not close to flowers',
+    'bunny is still',
+    'bunny is moving',
 ]
 
-text_tokens = clip.tokenize([text for text in text_array]).cuda()
 semantic_text_tokens = clip.tokenize([text for text in semantic_text_array]).cuda()
 
 vidcap = cv2.VideoCapture('big_buck_bunny_720p_5mb.mp4')
@@ -167,14 +100,29 @@ while success:
     im_pil = cv2.cvtColor(image, cv2.COLOR_BGR2RGB)
     im_pil = Image.fromarray(im_pil)
 
-    # indexes, scores = interrogate(im_pil, text_tokens)
-    # frame_and_score = 'frame '+str(count)+'- ['+str(indexes[0])+'] ('+str(scores[0])+')'
-    # print (frame_and_score + ' ' + text_array[indexes[0]] )
-
     scores, normalized_scores = interrogate_scores(im_pil, semantic_text_tokens)
     max = scores.argmax()
+    has_bunny = scores[semantic_text_array.index('a bunny')] > scores[semantic_text_array.index('no bunny')]
+    has_flowers = scores[semantic_text_array.index('flowers')] > scores[semantic_text_array.index('no flowers')]
+    # bunny_close_to_flowers = scores[semantic_text_array.index('bunny\'s nose is in the flowers')] > scores[semantic_text_array.index('bunny\'s nose is not in the flowers')]
+    bunny_is_still = scores[semantic_text_array.index('bunny is still')] > scores[semantic_text_array.index('bunny is moving')]
+    bunny_smell_flowers = scores[semantic_text_array.index('bunny is smelling the flowers')] > scores[semantic_text_array.index('bunny is not smelling the flowers')]
     frame_and_score = 'frame '+str(count)+'- ['+str(max)+'] ('+str(normalized_scores[max])+')'
-    print (frame_and_score + ' ' + semantic_text_array[max] )
+    semantic = ''
+    if has_bunny: 
+        semantic = semantic + 'has_bunny, '
+    if has_flowers:
+        semantic = semantic + 'has_flowers, '
+    # if bunny_close_to_flowers:
+    #     semantic = semantic + 'bunny_close_to_flowers, '
+    if bunny_is_still:
+        semantic = semantic + 'bunny_is_still, '
+    if bunny_smell_flowers:
+        semantic = semantic + 'bunny_smell_flowers, '
+    # if has_bunny and has_flowers and bunny_close_to_flowers and bunny_smell_flowers:
+    if has_bunny and has_flowers and bunny_is_still and bunny_smell_flowers:
+        semantic = '---** YES **--- ' + semantic
+    print (frame_and_score + ' ' + semantic + '. ' + semantic_text_array[max] )
 
     cv2.imwrite("frame%d.jpg" % count, image)     # save frame as JPEG file      
     # cv2.imwrite(frame_and_score, image)     # save frame as JPEG file   
