@@ -83,46 +83,102 @@ def rank_top_from_tokens(image_features, text_tokens):
         similarity += (image_features[i].unsqueeze(0) @ text_features.T).softmax(dim=-1)
 
     # _, top_labels = similarity.cpu().topk(1, dim=-1)
-    fred, top_labels = similarity.cpu().topk(1, dim=-1)
-    return text_array[top_labels[0][0].numpy()]
+    top_scores, top_labels = similarity.cpu().topk(1, dim=-1)
+    top_index = int(top_labels[0][0].numpy())
+    top_label = text_array[top_index]
+    top_score = top_scores[0][0].numpy().max()
+    return top_index, top_score
 
+def rank_from_tokens(image_features, text_tokens, top_n=None):
+    if top_n is None:
+        top_n = len(text_tokens)
+    with torch.no_grad():
+        text_features = clip_model.encode_text(text_tokens).float()
+    text_features /= text_features.norm(dim=-1, keepdim=True)
+
+    similarity = torch.zeros((1, len(text_array)), device=device)
+    for i in range(image_features.shape[0]):
+        # similarity += (image_features[i].unsqueeze(0) @ text_features.T).softmax(dim=-1)
+        similarity += (image_features[i].unsqueeze(0) @ text_features.T)
+
+    # _, top_labels = similarity.cpu().topk(1, dim=-1)
+    top_scores, top_labels = similarity.cpu().topk(top_n, dim=-1)
+    top_indexes = top_labels[0].numpy()
+    top_scores = top_scores[0].numpy()
+    return top_indexes, top_scores
 
 def interrogate(image, text_tokens):
-    caption = "Skipping blip"
-    # caption = generate_caption(image)
-
     images = clip_preprocess(image).unsqueeze(0).cuda()
     with torch.no_grad():
         image_features = clip_model.encode_image(images).float()
     image_features /= image_features.norm(dim=-1, keepdim=True)
 
-    res = rank_top_from_tokens(image_features, text_tokens)
-    return res
+    # index, score = rank_top_from_tokens(image_features, text_tokens)
+    # return index, score
+    indexs, scores = rank_from_tokens(image_features, text_tokens)
+    return indexs, scores
+
+def interrogate_scores(image, text_tokens):
+    images = clip_preprocess(image).unsqueeze(0).cuda()
+    with torch.no_grad():
+        image_features = clip_model.encode_image(images).float()
+    image_features /= image_features.norm(dim=-1, keepdim=True)
+    with torch.no_grad():
+        text_features = clip_model.encode_text(text_tokens).float()
+    text_features /= text_features.norm(dim=-1, keepdim=True)
+
+    similarity = torch.zeros((1, len(text_tokens)), device=device)
+    for i in range(image_features.shape[0]):
+        # similarity += (image_features[i].unsqueeze(0) @ text_features.T).softmax(dim=-1)
+        similarity += (image_features[i].unsqueeze(0) @ text_features.T)
+
+    scores = similarity[0].cpu().numpy()
+    normalized_scores = similarity.softmax(dim=-1)[0].cpu().numpy()
+    return scores, normalized_scores
+
 
 text_array = [
-    'bunny, flowers, the bunny is smelling the flowers',
-    'bunny, flowers, the bunny is yawning',
-    'bunny, flowers, the bunny is smelling the air',
-    'bunny, flowers, the bunny looking at the flowers',
-    'bunny, flowers',
-    'bunny, no flowers',
-    'no bunny, flowers',
-    'no bunny, no flowers'
+    'i see a bunny that is smelling the flowers',
+    'i do not see a bunny',
+    'i see a big bunny, but it is not smelling the flowers',
+    'Donald Trump'
+]
+
+semantic_text_array = [
+    'rabbit is smelling the flowers',
+    'rabbit is not smelling the flowers',
+    'a rabbit',
+    'no rabbit',
+    'flowers',
+    'no flowers',
+    'rabbit is close to flowers',
+    'rabbit is not close to flowers',
 ]
 
 text_tokens = clip.tokenize([text for text in text_array]).cuda()
+semantic_text_tokens = clip.tokenize([text for text in semantic_text_array]).cuda()
 
 vidcap = cv2.VideoCapture('big_buck_bunny_720p_5mb.mp4')
 success,image = vidcap.read()
 count = 0
 while success:
+    vidcap.set(cv2.CAP_PROP_POS_MSEC,(count*1000)) # once per second
     from PIL import Image 
     im_pil = cv2.cvtColor(image, cv2.COLOR_BGR2RGB)
     im_pil = Image.fromarray(im_pil)
-    res = interrogate(im_pil, text_tokens)
-    print ('frame '+str(count)+': ' +res)
-    if res == text_array[0]:
-        cv2.imwrite("frame%d.jpg" % count, image)     # save frame as JPEG file      
+
+    # indexes, scores = interrogate(im_pil, text_tokens)
+    # frame_and_score = 'frame '+str(count)+'- ['+str(indexes[0])+'] ('+str(scores[0])+')'
+    # print (frame_and_score + ' ' + text_array[indexes[0]] )
+
+    scores, normalized_scores = interrogate_scores(im_pil, semantic_text_tokens)
+    max = scores.argmax()
+    frame_and_score = 'frame '+str(count)+'- ['+str(max)+'] ('+str(normalized_scores[max])+')'
+    print (frame_and_score + ' ' + semantic_text_array[max] )
+
+    cv2.imwrite("frame%d.jpg" % count, image)     # save frame as JPEG file      
+    # cv2.imwrite(frame_and_score, image)     # save frame as JPEG file   
+
     success,image = vidcap.read()
     count += 1
 
