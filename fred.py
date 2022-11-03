@@ -49,14 +49,17 @@ flavor_intermediate_count = 2048
 device = torch.device('cuda' if torch.cuda.is_available() else 'cpu')
 
 # print("Loading BLIP model...")
-blip_image_eval_size = 384
+# blip_image_eval_size = 384
 # blip_model_url = 'https://storage.googleapis.com/sfr-vision-language-research/BLIP/models/model_large_caption.pth'        
 # blip_model = blip_decoder(pretrained=blip_model_url, image_size=blip_image_eval_size, vit='large', med_config='./src/blip/configs/med_config.json')
 # blip_model.eval()
 # blip_model = blip_model.to(device)
 
+blip_image_eval_size = 336
+
 print("Loading CLIP model...")
 clip_model_name = 'ViT-L/14' #@param ['ViT-B/32', 'ViT-B/16', 'ViT-L/14', 'ViT-L/14@336px', 'RN101', 'RN50', 'RN50x4', 'RN50x16', 'RN50x64'] {type:'string'}
+# clip_model_name = 'ViT-L/14@336px' #@param ['ViT-B/32', 'ViT-B/16', 'ViT-L/14', 'ViT-L/14@336px', 'RN101', 'RN50', 'RN50x4', 'RN50x16', 'RN50x64'] {type:'string'}
 clip_model, clip_preprocess = clip.load(clip_model_name, device="cuda")
 clip_model.cuda().eval()
 
